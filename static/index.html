@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Решись Авиа — Динамическое ценообразование</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="chart.min.js"></script>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <span class="brand-title">Решись Авиа</span>
+    </div>
+    <div class="auth-bar">
+        <span class="user-badge" id="userBadge">Гость</span>
+        <button class="btn btn-outlined" id="authBtn" onclick="openAuthModal()">Сменить аккаунт</button>
+    </div>
+</header>
+
+<main class="app-layout">
+    <aside class="sidebar">
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Параметры рейса</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="routeSelect">Маршрут</label>
+                <select id="routeSelect" onchange="onRouteChanged()"></select>
+            </div>
+
+            <div class="form-group">
+                <label for="dateInput">Дата вылета</label>
+                <input type="date" id="dateInput" min="2026-06-01" max="2026-07-01" value="2026-06-12" onchange="calculate()">
+            </div>
+
+            <div class="form-group">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <label for="priceInput" style="margin:0;">Цена билета</label>
+                    <span id="priceDisplay" style="font-size:13px; font-weight:600; color:var(--color-primary);">0 ₽</span>
+                </div>
+                <input type="number" id="priceInput" step="100" oninput="onPriceTyped()">
+                <div class="slider-container">
+                    <input type="range" id="priceSlider" step="100" oninput="onPriceSlid()">
+                    <div class="slider-labels">
+                        <span id="minPriceLbl">0</span>
+                        <span id="basePriceLbl">Базовая: 0</span>
+                        <span id="maxPriceLbl">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="calculate()">Применить тариф</button>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Параметры направления</span>
+            </div>
+            <div class="route-info-grid">
+                <div class="info-item">
+                    <span>Базовый тариф</span>
+                    <b id="rBasePrice">-</b>
+                </div>
+                <div class="info-item">
+                    <span>Переменные затраты</span>
+                    <b id="rCost">-</b>
+                </div>
+                <div class="info-item">
+                    <span>Чувствительность к цене</span>
+                    <b id="rSens">-</b>
+                </div>
+                <div class="info-item">
+                    <span>Вместимость ВС</span>
+                    <b id="rSeats">-</b>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <section class="main-content">
+        <div class="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-label">Спрос (желают)</div>
+                <div class="kpi-val" id="kpiDesired">-</div>
+                <div class="kpi-sub" id="kpiBaseComp">при базовой: -</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Продажи</div>
+                <div class="kpi-val highlight" id="kpiSold">-</div>
+                <div class="kpi-sub" id="kpiSoldSub">с учётом кресел</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Загрузка борта</div>
+                <div class="kpi-val" id="kpiLoad">-</div>
+                <div class="kpi-sub" id="kpiLoadSub">от вместимости</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Выручка рейса</div>
+                <div class="kpi-val" id="kpiRev">-</div>
+                <div class="kpi-sub">тариф × продажи</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Прибыль рейса</div>
+                <div class="kpi-val highlight" id="kpiProfit">-</div>
+                <div class="kpi-sub">(тариф - затраты) × продажи</div>
+            </div>
+        </div>
+
+        <div class="chart-box">
+            <div class="panel-header">
+                <span class="panel-title">Распределение спроса по квантилям (0.1 – 0.9) при текущем тарифе</span>
+                <span id="optPriceBadge" style="font-size:11px; color:var(--color-accent);">Оптимум медианы: -</span>
+            </div>
+            <div class="chart-area">
+                <canvas id="demandChart"></canvas>
+            </div>
+        </div>
+
+        <div class="table-box">
+            <div class="panel-header">
+                <span class="panel-title">Сценарный анализ квантилей спроса</span>
+            </div>
+            <table id="quantilesTable">
+                <thead>
+                    <tr>
+                        <th>Квантиль</th>
+                        <th class="num">Спрос при базовой цене</th>
+                        <th class="num">Спрос при текущей цене</th>
+                        <th class="num">Фактические продажи</th>
+                        <th class="num">Оптимальная цена квантиля</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<div class="modal-overlay" id="gateModal">
+    <div class="modal-card">
+        <h2>Авторизация</h2>
+        <p>Войдите или зарегистрируйтесь для доступа к панели</p>
+
+        <div class="tab-group">
+            <button class="tab-btn active" id="tabLogin" onclick="switchAuthTab('login')">Вход</button>
+            <button class="tab-btn" id="tabRegister" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+
+        <div class="form-group">
+            <label for="authUsername">Логин</label>
+            <input type="text" id="authUsername" placeholder="Имя пользователя">
+        </div>
+        <div class="form-group">
+            <label for="authPassword">Пароль</label>
+            <input type="password" id="authPassword" placeholder="••••••••">
+        </div>
+
+        <div class="modal-msg" id="authMsg"></div>
+
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px;">
+            <button class="btn btn-primary" id="authSubmitBtn" onclick="handleAuthSubmit()">Войти в систему</button>
+            <button class="btn btn-outlined" onclick="continueAsGuest()">Продолжить в гостевом режиме</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
